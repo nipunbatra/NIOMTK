@@ -5,14 +5,15 @@ import os
 import os.path
 from os import *
 from os.path import *
+from pandas import *
 
-def get_files(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK'):
+def get_files(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK_datasets'):
 	assert isdir(dir_path)
-	files=[join(dir_path, file) for file in listdir(dir_path) if isfile(join(dir_path, file)) and '.h5' and file]
+	files=[join(dir_path, file) for file in listdir(dir_path) if isfile(join(dir_path, file)) and 'combed.h5' in file]
 	files.sort()
 	return files
 
-def get_daily_average_for_all(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK'):
+def get_daily_average_for_all(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK_datasets'):
 	files=get_files(dir_path)
 	for i in files:
 		current_file=join(dir_path, i)
@@ -42,6 +43,13 @@ def get_std_for_current(current_file):
 		print ("Printing results only according to standard deviation: ")
 		print (data_daily_std > threshold)
 
+'''def get_range_for_current(current_file):
+	store=HDFStore(current_file)
+	for key in store.keys():
+		value=store[key]
+		data_daily_range=value.resample('D')
+		for i in data_daily_range.index:
+'''			
 def get_threshold(dataframe):
 	arr=dataframe.values
 	current_max=arr[0][1]
@@ -52,6 +60,30 @@ def get_threshold(dataframe):
 			threshold=arr[i]
 	return threshold
 
+def find_max(dataframe):
+        arr=dataframe.values
+        current_max=arr[0][1]
+        threshold=arr[0]
+        for i in range(1, len(arr)):
+                if (arr[i][1])>current_max:
+                        current_max=arr[i][1]
+                        threshold=arr[i]
+        return threshold
+
+def find_min(dataframe):
+        arr=dataframe.values
+        current_min=arr[0][1]
+        threshold=arr[0]
+        for i in range(1, len(arr)):
+                if (arr[i][1]) < current_min:
+                        current_min=arr[i][1]
+                        threshold=arr[i]
+        return threshold
+
+
 def get_average_threshold(dataframe):
 	threshold=sum(dataframe.values)/len(dataframe.values)
 	return threshold
+
+get_files()
+get_daily_average_for_all()
