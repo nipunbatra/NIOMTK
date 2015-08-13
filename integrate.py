@@ -14,6 +14,11 @@ import random
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 import pytz
 
+results_dic = {}
+knn_summer_results = []
+svm_summer_results = []
+knn_winter_results = []
+svm_winter_results = []
 def stats(testSet, predictions):
     tp = 0
     tn = 0
@@ -32,9 +37,13 @@ def stats(testSet, predictions):
     print "TN = ", tn
     print "FP = ", fp
     print "FN = ", fn
-    print "Accuracy = ", (tp + tn + 0.0)/(tp + tn + fp + fn)
-    print "Precision = ", (tp + 0.0)/ (tp + fp)
-    print "Recall = ", (tp + 0.0)/(tp + fn)
+    accuracy = (tp + tn + 0.0)/(tp + tn + fp + fn)
+    precision = (tp + 0.0)/ (tp + fn)
+    recall = (tp + 0.0)/(tp + fp)
+    print "Accuracy = ", accuracy
+    print "Precision = ", precision
+    print "Recall = ", recall
+    return [accuracy, precision, recall]
 
 def occupancy(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK_datasets', csv = '/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/01_occupancy_csv/01_summer.csv'):
     eastern = pytz.timezone('GMT')
@@ -142,7 +151,16 @@ def occupancy(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/
     arr2 = np.asarray([int(i) for i in ground_truth_test_array])
     print "-----SVM-----"
     print (metrics.classification_report(arr1, arr2))
-    stats(arr2, arr1)
+    #temp = {"SVM": }
+    results_dic[csv.split("/")[-1] + "_svm"] = stats(arr2, arr1)
+    # if "summer" in csv:
+    #     temp1 = {csv: temp}
+    #     results_dic["summer"] = temp1
+    # else:
+    #     temp1 = {csv: temp}
+    #     results_dic["winter"] = temp1
+    #results_dic[csv]["SVM"] = 
+
 
     neigh = KNeighborsClassifier(n_neighbors=3)
     neigh.fit(dataframe_train_array, ground_truth_train_array)
@@ -151,10 +169,20 @@ def occupancy(dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/
     predictions = []
     for i in dataframe_test_array:
         predictions.append(int(neigh.predict([i])))
-    stats(ground_truth_test_array, predictions)
+    #temp = {"KNN": stats(arr2, arr1)}
+    results_dic[csv.split("/")[-1] + "_knn"] = stats(ground_truth_test_array, predictions)
+    # temp = {"KNN": }
+    # if "summer" in csv:
+    #     temp1 = {csv: temp}
+    #     results_dic["summer"] = temp1
+    # else:
+    #     temp1 = {csv: temp}
+    #     results_dic["winter"] = temp1
+  #  results_dic[csv]["KNN"] = 
 
 
-path = "/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP"
+#path = "/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP"
+path = "/Users/Rishi/Documents/Master_folder/Semester_7/BTP"
 csv_files = [i for i in listdir(path) if '_csv' in i]
 csv_list = []
 for i in csv_files:
@@ -163,6 +191,9 @@ for i in csv_files:
     for j in file_list:
         csv_list.append(join(directory, j))
 
-dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK_datasets'
+print csv_list
+#dir_path='/Users/rishi/Documents/Master_folder/IIITD/6th_semester/BTP/NIOMTK_datasets'
+dir_path = "/Users/Rishi/Downloads"
 for i in csv_list:
     occupancy(dir_path, i)
+print results_dic
