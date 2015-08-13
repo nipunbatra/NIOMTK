@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numpy import *
 from pandas import *
-import matplotlib
+import matplotlib as plt
 import os
 import os.path
 from os import *
@@ -197,3 +197,10 @@ dir_path = "/Users/Rishi/Downloads"
 for i in csv_list:
     occupancy(dir_path, i)
 print results_dic
+results = {"Summer": [{"home1": results_dic[01_summer_svm]}, {"home1": results_dic{01_summer_knn}}]}
+print results
+# D = results_dic
+# plt.bar(range(len(D)), D.values(), align='center')
+# plt.xticks(range(len(D)), list(D.keys()))
+
+# plt.show()
