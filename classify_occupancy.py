@@ -3,7 +3,7 @@ import os.path
 from os import *
 from os.path import *
 from itertools import chain
-
+from sklearn import tree
 import pandas as pd
 from numpy import *
 from pandas import *
@@ -14,7 +14,7 @@ import pytz
 results_dic = {}
 DIR_PATH = os.path.expanduser("~/NIOMTK_datasets")
 
-classifiers_dict = {"SVM": svm.SVC(), "KNN": KNeighborsClassifier(n_neighbors=3)}
+classifiers_dict = {"SVM": svm.SVC(), "KNN": KNeighborsClassifier(n_neighbors=3), "DECISION TREE":tree.DecisionTreeClassifier()}
 
 
 def stats(testSet, predictions):
@@ -122,8 +122,7 @@ def classify_home(dir_path=DIR_PATH, csv=None):
     for i in range(min(len(dataframe_train_array), len(dataframe_test_array))):
         if (random.random() < split):
             dataframe_train_array[i], dataframe_test_array[i] = dataframe_test_array[i], dataframe_train_array[i]
-            occupancy_ground_truth_train[i], occupancy_ground_truth_test[i] = occupancy_ground_truth_test[i], \
-                                                                              occupancy_ground_truth_train[i]
+            occupancy_ground_truth_train[i], occupancy_ground_truth_test[i] = occupancy_ground_truth_test[i], occupancy_ground_truth_train[i]
 
     # print len(dataframe_train_array)
     print dataframe_test_array
