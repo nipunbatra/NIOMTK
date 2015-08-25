@@ -1,7 +1,7 @@
 from os import *
 from os.path import *
 from itertools import chain
-
+import os
 from sklearn import tree
 import pandas as pd
 from numpy import *
@@ -9,147 +9,85 @@ from pandas import *
 from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 import pytz
+import matplotlib.pyplot as plt
+from sklearn.cross_validation import train_test_split
+from sklearn.metrics import *
+from sklearn.ensemble import RandomForestClassifier
+from common_functions import  *
 
 results_dic = {}
-DIR_PATH = os.path.expanduser("~/NIOMTK_datasets")
+output_path = os.path.expanduser("~/Dropbox/niomtk_data/eco/downsampled")
 
 classifiers_dict = {"SVM": svm.SVC(), "KNN": KNeighborsClassifier(n_neighbors=3),
-                    "DECISION TREE": tree.DecisionTreeClassifier()}
+                    "DT": tree.DecisionTreeClassifier(),"RF":RandomForestClassifier()}
+
+metric_dict = {"Precision":precision_score, "Recall":recall_score,
+               "MCC":matthews_corrcoef, "Accuracy":accuracy_score}
+
+def accuracy_metrics(test_gt, prediction):
+    tp=None
+    tn=None
+    fp=None
+    fn=None
+    return fp
+
+def classify_train_test_same_home(folder_path):
+    out = {}
+    for season in ["summer", "winter"]:
+        out[season] = {}
+        season_path = os.path.join(folder_path, season)
+        for home in [1, 2, 3, 4, 5]:
+            out[season][home] = {}
+            home_path = season_path+"/"+str(home)+".csv"
+            df = pd.read_csv(home_path, index_col=0)
+            df.index = pd.to_datetime(df.index)
+            df = df.between_time("06:00", "22:00")
+            X = df
+            y = X.pop('occupancy')
+            X_train_idx,X_test_idx,y_train,y_test = train_test_split(X.index,y,test_size=0.2)
+            X_train = X.ix[X_train_idx]
+            X_test = X.ix[X_test_idx]
+            for clf_name, clf in classifiers_dict.iteritems():
+                out[season][home][clf_name] = {}
+                clf.fit(X_train, y_train)
+                pred = clf.predict(X_test)
+                for metric_name, metric_func in metric_dict.iteritems():
+                    out[season][home][clf_name][metric_name] = metric_func(y_test, pred)
+
+    return out
 
 
-def stats(testSet, predictions):
-    tp = 0
-    tn = 0
-    fp = 0
-    fn = 0
-    for x in range(len(testSet)):
-        if int(testSet[x]) == 1 and int(predictions[x]) == 1:
-            tp += 1
-        elif (int(testSet[x]) == 0 and int(predictions[x]) == 1):
-            fp += 1
-        elif (int(testSet[x]) == 1 and int(predictions[x]) == 0):
-            fn += 1
-        else:
-            tn += 1
-    print "TP = ", tp
-    print "TN = ", tn
-    print "FP = ", fp
-    print "FN = ", fn
-    accuracy = (tp + tn + 0.0) / (tp + tn + fp + fn)
-    precision = (tp + 0.0) / (tp + fn)
-    recall = (tp + 0.0) / (tp + fp)
-    print "Accuracy = ", accuracy
-    print "Precision = ", precision
-    print "Recall = ", recall
-    return [accuracy, precision, recall]
+
+out = classify_train_test_same_home(output_path)
+res = {}
+for season, season_dict in out.iteritems():
+    fig, ax = plt.subplots(nrows=3)
+    res[season] = {}
+    for metric in metric_dict.keys():
+        res[season][metric] = {}
+        for home, home_results in season_dict.iteritems():
+            res[season][metric][home] = pd.DataFrame(home_results).T.to_dict()[metric]
 
 
-def classify_home(dir_path=DIR_PATH, csv=None):
-    home_number = csv.split("/")[-1]
-    results_dic[home_number] = {}
-    eastern = pytz.timezone('GMT')
-    df = pd.read_csv(csv)
-    start_date = df.values[0][0]
-    end_date = df.values[-1][0]
+# Plotting
+latexify(fig_height=3.2)
+fig, ax = plt.subplots(nrows=2, sharex=True)
+summer_df = pd.DataFrame(res['summer']['Accuracy']).T
+winter_df = pd.DataFrame(res['summer']['Accuracy']).T
 
-    index = pd.DatetimeIndex(start=start_date, periods=len(df) * 86400, freq='1s')
-    index = index.tz_localize(pytz.utc).tz_convert(eastern)
+summer_df.plot(ax=ax[0], rot=0, title="Summer", kind="bar").legend(ncol=5, loc='upper center', bbox_to_anchor=(0.5, 1.2))
+winter_df.plot(ax=ax[1], rot=0, title="Winter", kind="bar", legend=False)
 
-    out = []
-    for i in range(len(df)):
-        out.append(df.ix[i].values[1:])
-    out_1d = list(chain.from_iterable(out))
+format_axes(ax[0])
+format_axes(ax[1])
 
-    df_new = pd.Series(out_1d, index=index)
-    df_resampled = df_new.resample("15min")
-    ground_truth = df_resampled
-
-    store = HDFStore(join(dir_path, 'eco.h5'))
-    df = store['/building1/elec/meter1']
-    dataframe = df['power']['active'][start_date:end_date].resample('15min')
-
-    id = dataframe.index
-    dataframe.index = id.tz_convert(eastern)
-
-    dataframe_index = dataframe.index
-    ground_truth_index = ground_truth.index
-    index_intersection = dataframe_index.intersection(ground_truth_index)
-    dataframe_list = []
-
-    ground_truth_list = []
-    for i in index_intersection:
-        dataframe_list.append(dataframe[i])
-        ground_truth_list.append(ground_truth[i])
-
-    ground_truth = pd.Series(ground_truth_list, index_intersection)
-    dataframe = pd.Series(dataframe_list, index_intersection)
-
-    a = dataframe.index[len(ground_truth.values) / 2]
-    # print a
-    power_dataframe_train = dataframe[:a]
-    # print len(dataframe_train)
-    occupancy_ground_truth_train = ground_truth[:a]
+ax[1].set_xlabel("Household")
+ax[0].set_ylabel("Accuracy")
+ax[1].set_ylabel("Accuracy")
 
 
-    # Dropna?
-    lis = []
-    for i in power_dataframe_train:
-        if np.isnan(i) == False:
-            lis.append([i])
-        else:
-            lis.append([0])
-    ###
-    dataframe_train_array = np.asarray(lis)
-    ground_truth_train_array = occupancy_ground_truth_train.values
-    ###
+#plt.tight_layout()
+plt.savefig("figures/same_home_train.pdf", bbox_inches="tight")
 
 
-    power_dataframe_test = dataframe.tail(len(occupancy_ground_truth_train))
-    occupancy_ground_truth_test = ground_truth.tail(len(occupancy_ground_truth_train))
 
-    lis = []
-    for i in power_dataframe_test:
-        if np.isnan(i) == False:
-            lis.append([i])
-        else:
-            lis.append([0])
-    ###
-    dataframe_test_array = np.asarray(lis)
-    ground_truth_test_array = occupancy_ground_truth_test.values
-    ###
-    random.seed(42)
-    split = 0.5
-    for i in range(min(len(dataframe_train_array), len(dataframe_test_array))):
-        if (random.random() < split):
-            dataframe_train_array[i], dataframe_test_array[i] = dataframe_test_array[i], dataframe_train_array[i]
-            occupancy_ground_truth_train[i], occupancy_ground_truth_test[i] = occupancy_ground_truth_test[i], \
-                                                                              occupancy_ground_truth_train[i]
-
-    # print len(dataframe_train_array)
-    print dataframe_test_array
-    # print len(ground_truth_train)
-
-    for clf_name, clf in classifiers_dict.iteritems():
-        clf.fit(dataframe_train_array, ground_truth_train_array)
-        prediction = clf.predict(dataframe_test_array)
-
-        arr1 = np.asarray([int(i) for i in prediction])
-        arr2 = np.asarray([int(i) for i in ground_truth_test_array])
-
-        # temp = {"SVM": }
-        results_dic[home_number][clf_name] = stats(arr2, arr1)
-
-
-path = os.path.expanduser("~/csv_files")
-csv_files = [i for i in listdir(path) if '_csv' in i][:2]
-csv_list = []
-for i in csv_files:
-    directory = join(path, i)
-    file_list = [j for j in listdir(directory) if ".csv" in j]
-    for j in file_list:
-        csv_list.append(join(directory, j))
-
-print csv_list
-for i in csv_list:
-    classify_home(DIR_PATH, i)
-print results_dic
