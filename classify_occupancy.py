@@ -14,6 +14,8 @@ from sklearn.cross_validation import train_test_split
 from sklearn.metrics import *
 from sklearn.ensemble import RandomForestClassifier
 from common_functions import  *
+import itertools
+
 
 results_dic = {}
 output_path = os.path.expanduser("~/Dropbox/niomtk_data/eco/downsampled")
@@ -30,6 +32,46 @@ def accuracy_metrics(test_gt, prediction):
     fp=None
     fn=None
     return fp
+
+def classify_train_test_split(folder_path):
+out = {}
+for season in ["summer", "winter"]:
+    out[season] = {}
+    season_path = os.path.join(folder_path, season)
+    X_train_list = []
+    y_train_list = []
+    X_test_list= []
+    y_test_list = []
+
+
+    for home in [1, 2, 3, 4, 5]:
+        out[season][home] = {}
+        home_path = season_path+"/"+str(home)+".csv"
+        df = pd.read_csv(home_path, index_col=0)
+        df.index = pd.to_datetime(df.index)
+        df = df.between_time("06:00", "22:00")
+        X = df
+        y = X.pop('occupancy')
+        X_train_idx,X_test_idx,y_train,y_test = train_test_split(X.index,y,test_size=0.2)
+        X_train_list.append(X.ix[X_train_idx])
+        X_test_list.append(X.ix[X_test_idx])
+        y_train_list.append(y_train)
+        y_test_list.append(y_test)
+    y_train_list=list(itertools.chain(*y_train_list))
+    y_test_list=list(itertools.chain(*y_test_list))
+    X_train_list = pd.concat(X_train_list)
+    X_test_list = pd.concat(X_test_list)
+
+        for clf_name, clf in classifiers_dict.iteritems():
+            out[season][home][clf_name] = {}
+            clf.fit(X_train, y_train)
+            pred = clf.predict(X_test)
+            for metric_name, metric_func in metric_dict.iteritems():
+                out[season][home][clf_name][metric_name] = metric_func(y_test, pred)
+
+    return out
+
+
 
 def classify_train_test_same_home(folder_path):
     out = {}
