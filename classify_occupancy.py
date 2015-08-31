@@ -44,9 +44,7 @@ def classify_train_test_split(folder_path):
 
 
     for season in ["summer", "winter"]:
-        print season
         season_path = os.path.join(folder_path, season)
-        print season_path
         for home in [1, 2, 3, 4, 5]:
             home_path = season_path+"/"+str(home)+".csv"
             df = pd.read_csv(home_path, index_col=0)
@@ -75,17 +73,69 @@ def classify_train_test_split(folder_path):
     return out
 
 
-def nilm_based():
-    folder_path = output_path
-    season = "summer"
-    home=1
+def nilm_pair(home, season, folder_path):
+    from copy import deepcopy
     season_path = os.path.join(folder_path, season)
     home_path = season_path+"/"+str(home)+".csv"
     df = pd.read_csv(home_path, index_col=0)
     df.index = pd.to_datetime(df.index)
     df = df.between_time("06:00", "22:00")
+    from nilmtk.feature_detectors.steady_states import find_steady_states, find_steady_states_transients
+    from nilmtk.disaggregate.hart_85 import Hart85
+    h = Hart85()
+
+    # Train on DF to get pairs.
+    # 1. Between pairs put occupancy as 1
+    # 2. If not a pair, then also put occupancy as 1
+    ss, tr = find_steady_states(df[["power"]])
+    pred = pd.DataFrame({"occupancy":np.zeros(len(df))}, index=df.index)
+
+    pred.ix[tr.index] = 1
+    h.transients = deepcopy(tr)
+
+    pair_df = h.pair(buffer_size=20,
+              min_tolerance=100, percent_tolerance=0.035,
+              large_transition=1000)
+    for idx, row in pair_df.iterrows():
+        start = row['T1 Time']
+        end = row['T2 Time']
+        pred[start:end] = 1
+
+    pred_resampled = pred.resample("15T", how="max")
+    gt_occupancy = df["occupancy"].resample("15T", how="max").dropna()
+    index_intersection = gt_occupancy.index.intersection(pred_resampled.index)
+    return {"Accuracy":
+            accuracy_score(gt_occupancy.ix[index_intersection], pred_resampled.ix[index_intersection]),
+            "MCC":matthews_corrcoef(gt_occupancy.ix[index_intersection], pred_resampled.ix[index_intersection])
+            }
+
+
+def nilm_naive(home, season, folder_path):
+
+    season_path = os.path.join(folder_path, season)
+    home_path = season_path+"/"+str(home)+".csv"
+    df = pd.read_csv(home_path, index_col=0)
+    df.index = pd.to_datetime(df.index)
+    df = df.between_time("06:00", "22:00")
+    from nilmtk.feature_detectors.steady_states import find_steady_states, find_steady_states_transients
+    """
     X = df
     y = X.pop('occupancy')
+    X_train_idx,X_test_idx,y_train,y_test = train_test_split(X.index,y,test_size=0.2)
+    X_train = X.ix[X_train_idx]
+    X_test = X.ix[X_test_idx]
+    """
+    ss, tr = find_steady_states(df[["power"]])
+    pred = pd.DataFrame({"occupancy":np.zeros(len(df))}, index=df.index)
+
+    pred.ix[tr.index] = 1
+    pred_resampled = pred.resample("15T", how="max")
+    gt_occupancy = df["occupancy"].resample("15T", how="max").dropna()
+    index_intersection = gt_occupancy.index.intersection(pred_resampled.index)
+    return {"Accuracy":
+            accuracy_score(gt_occupancy.ix[index_intersection], pred_resampled.ix[index_intersection]),
+            "MCC":matthews_corrcoef(gt_occupancy.ix[index_intersection], pred_resampled.ix[index_intersection])
+            }
 
 
 
@@ -111,6 +161,14 @@ def classify_train_test_same_home(folder_path):
                 pred = clf.predict(X_test)
                 for metric_name, metric_func in metric_dict.iteritems():
                     out[season][home][clf_name][metric_name] = metric_func(y_test, pred)
+                out[season][home]["NILM naive"] = nilm_naive(home, season,
+                                                                   os.path.expanduser("~/Dropbox/niomtk_data/eco/1min/"))
+
+                out[season][home]["NILM pairing"] = nilm_pair(home, season,
+                                                                   os.path.expanduser("~/Dropbox/niomtk_data/eco/1min/"))
+
+                out[season][home]["Always occupied"] = {}
+                out[season][home]["Always occupied"]["Accuracy"] = accuracy_score(y_test, np.ones(len(y_test)))
 
     return out
 
@@ -118,7 +176,7 @@ def classify_train_test_same_home(folder_path):
 
 
 
-def plot_train_single():
+def plot_train_single(metric_plot="Accuracy"):
     out = classify_train_test_same_home(output_path)
     res = {}
     for season, season_dict in out.iteritems():
@@ -129,24 +187,25 @@ def plot_train_single():
             for home, home_results in season_dict.iteritems():
                 res[season][metric][home] = pd.DataFrame(home_results).T.to_dict()[metric]
         # Plotting
-    latexify(fig_height=3.2)
+    latexify(columns=2, fig_height=4)
     fig, ax = plt.subplots(nrows=2, sharex=True)
-    summer_df = pd.DataFrame(res['summer']['Accuracy']).T
-    winter_df = pd.DataFrame(res['winter']['Accuracy']).T
+    summer_df = pd.DataFrame(res['summer'][metric_plot]).T
+    winter_df = pd.DataFrame(res['winter'][metric_plot]).T
 
-    summer_df.plot(ax=ax[0], rot=0, title="Summer", kind="bar").legend(ncol=5, loc='upper center', bbox_to_anchor=(0.5, 1.2))
+    summer_df.plot(ax=ax[0], rot=0, title="Summer", kind="bar").legend(ncol=5, loc='upper center', bbox_to_anchor=(0.5, 1.4))
     winter_df.plot(ax=ax[1], rot=0, title="Winter", kind="bar", legend=False)
 
     format_axes(ax[0])
     format_axes(ax[1])
 
     ax[1].set_xlabel("Household")
-    ax[0].set_ylabel("Accuracy")
-    ax[1].set_ylabel("Accuracy")
+    ax[0].set_ylabel(metric_plot)
+    ax[1].set_ylabel(metric_plot)
 
 
-    #plt.tight_layout()
-    plt.savefig("figures/same_home_train.pdf", bbox_inches="tight")
+    plt.tight_layout()
+    plt.savefig("figures/same_home_train_%s.pdf" %metric_plot, bbox_inches="tight")
+    plt.savefig("figures/same_home_train_%s.png" %metric_plot, bbox_inches="tight")
 
 def plot_train_all():
     out = classify_train_test_split(output_path)
