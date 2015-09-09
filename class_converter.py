@@ -41,8 +41,8 @@ def get_day_number(day):
 		return (str(year)+"-"+str(k-11)+"-"+str(date))
 	#return datetime(year, month, date)
 def get_time(digits):
-	if (digits > 48):
-		digits = digits % 48
+	if (int(digits) > 48):
+		digits = str(int(digits) % 48) 
 	list_of_keys = [str(i) for i in range(1, 49)]
 	#print list_of_keys
 	index = pd.date_range(start = '2009-March-7', periods = 48, freq = '30min')
@@ -65,7 +65,7 @@ def get_dataset(path_to_txt):
 	data = u"ID Code Power\n" + str(f1.read())
 	TESTDATA = StringIO(data)
 	df2 = DataFrame.from_csv(TESTDATA, sep=" ", parse_dates=False)
-	return df2
+	return df2[:336]
 def get_processed_dataset(path_to_txt):
 	dataset = get_dataset(path_to_txt)
 	id = dataset.index
@@ -73,5 +73,29 @@ def get_processed_dataset(path_to_txt):
 	power = dataset["Power"].values
 	dataset["Code"] = np.asarray([generate_timestamp_as_datetime(i) for i in codes])
 	return dataset
-print get_processed_dataset("/Users/Rishi/Downloads/file1.txt").head()
+def construct_new_dataframe(path_to_txt):
+	dataset = get_processed_dataset(path_to_txt)
+	index = dataset.index
+	code = np.asarray(dataset["Code"])
+	power = np.asarray(dataset["Power"])
+	index, code = code, index
+	df = DataFrame(code, index)
+	df["Power"] = power
+	return df
+def get_features(path_to_txt):
+	dataset = construct_new_dataframe(path_to_txt)
+	#Consumption figures. Come on man. You can fucking do this.
+	vector_1 = dataset["Power"].values
+	temp = pd.DatetimeIndex(dataset.index)
+	dataset["Weekday"] = dataset["Power"][temp.weekday == 1]
+	dataset["Weekend"] = dataset["Power"][temp.weekday == 3]
+	dataset["Maximum"] = df["Power"].resample('1d', how = 'max')
+	dataset["Minimum"] = df["Power"].resample('1d', how = 'min')
+	df["Between 6 pm and 10 pm"] = df["Power"].between_time("18:00", "22:00")
+	df["Between 6 am and 10 am"] = df["Power"].between_time("6:00", "10:00")
+	df["Between 1 am and 5 am"] = df["Power"].between_time("1:00", "5:00")
+	df["Between 10 am and 2m"] = df["Power"].between_time("10:00", "14:00")
+	print dataset.head(10)
+get_features("/Users/Rishi/Downloads/file1.txt")
+#print construct_new_dataframe("/Users/Rishi/Downloads/file1.txt").head()
 #FUCK YOU LIFE!!!
