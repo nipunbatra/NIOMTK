@@ -71,7 +71,9 @@ def get_dataset(path_to_txt):
 	data = u"ID Code Power\n" + str(f1.read())
 	TESTDATA = StringIO(data)
 	df2 = DataFrame.from_csv(TESTDATA, sep=" ", parse_dates=False)
-	return df2[:336]
+	print "PRINT THE FUCKING HEAD", df2.head()
+	df2.sort()
+	return df2[:1000]
 def get_processed_dataset(path_to_txt):
 	dataset = get_dataset(path_to_txt)
 	id = dataset.index
@@ -94,15 +96,17 @@ def construct_new_dataframe(path_to_txt):
 	# df = DataFrame(code, index)
 	# df["Power"] = power
 	# df.resample('D', how = 'max')
-	print (df.groupby(["Code"]).resample('2D', how = 'sum'))
-	return df
+	return df.sort_index()
 def get_features(path_to_txt):
-	dataset = construct_new_dataframe(path_to_txt)
+	dataset = construct_new_dataframe(path_to_txt)['2009-07-14':'2009-07-21']
+	dataset = dataset.sort()
+	#print dataset.head()
 	#Consumption figures. Come on man. You can fucking do this.
 	vector_1 = dataset["Power"].values
 	temp = pd.DatetimeIndex(dataset.index)
-	dataset["Weekday"] = dataset["Power"][temp.weekday == 1]
-	dataset["Weekend"] = dataset["Power"][temp.weekday == 3]
+	print "Temp.weekday", temp.weekday
+	dataset["Weekday"] = dataset["Power"][temp.weekday < 5]
+	dataset["Weekend"] = dataset["Power"][temp.weekday >= 5]
 	print dataset.head(15)
 	dataset["Maximum"] = dataset["Power"].resample('1d', how = 'max')
 	dataset["Minimum"] = dataset["Power"].resample('1d', how = 'min')
@@ -110,7 +114,14 @@ def get_features(path_to_txt):
 	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00")
 	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00")
 	dataset["Between 10 am and 2m"] = dataset["Power"].between_time("10:00", "14:00")
-	print dataset.head(10)
-get_features("/Users/Rishi/Downloads/file1.txt")
+	#Temporal properties
+	dataset["Entry greater than 1 KW"] = dataset["Power"][dataset["Power"] > 1]
+	dataset["Entry greater than 2 KW"] = dataset["Power"][dataset["Power"] > 2]
+	dataset["Entry equal to maximum"] = dataset["Power"][dataset["Power"] == dataset["Power"].max()]
+	dataset["Entry greater than mean"] = dataset["Power"][dataset["Power"] > dataset["Power"].mean()]
+	return dataset
+	#print "Length of dataset = ", len(dataset)
+
+print get_features("/Users/Rishi/Downloads/file1.txt")
 #print construct_new_dataframe("/Users/Rishi/Downloads/file1.txt").head(40)
 #FUCK YOU LIFE!!!
