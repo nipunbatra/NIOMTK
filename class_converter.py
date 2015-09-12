@@ -16,8 +16,9 @@ from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 import pytz
 import sys
-
-
+from pandas.tseries.offsets import *
+import random
+random.seed(42)
 def get_day_number(day):
 	day = int(day)
 	list_of_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -53,8 +54,13 @@ def get_time(digits):
 	return dic[digits]
 def generate_timestamp_as_datetime(class_timestamp):
 	string = generate_timestamp_as_string(class_timestamp)
-	print string
-	return parse(string)
+	print "Parsed string: ", parse(string)
+	print "Parsed string with type string:", str(parse(string))
+	print "Date offset: ", Second(random.uniform(0, 1801))
+	#print "Parsed string + DateOffset: ", str(parse(string)  + Second(0, 1801) + Milli(random.uniform(0, 1000)))
+	temp = parse(str(parse(string)  + Second(random.random() * 1800) + Milli(random.random() * 1800)))
+	print "Datetime: ", temp
+	return temp
 def generate_timestamp_as_string(class_timestamp):
 	first_part = class_timestamp/100
 	second_part = class_timestamp % 100
@@ -72,15 +78,23 @@ def get_processed_dataset(path_to_txt):
 	codes = dataset["Code"].values
 	power = dataset["Power"].values
 	dataset["Code"] = np.asarray([generate_timestamp_as_datetime(i) for i in codes])
+	print dataset.head()
 	return dataset
 def construct_new_dataframe(path_to_txt):
 	dataset = get_processed_dataset(path_to_txt)
+	#print dataset.head()
+	#dataset.set_index(['Code'])
 	index = dataset.index
 	code = np.asarray(dataset["Code"])
 	power = np.asarray(dataset["Power"])
 	index, code = code, index
-	df = DataFrame(code, index)
-	df["Power"] = power
+	dic = {"Index":index, "Code": code, "Power": power}
+	df = pd.DataFrame(dic)
+	df = df.set_index([pd.DatetimeIndex(df["Index"])])
+	# df = DataFrame(code, index)
+	# df["Power"] = power
+	# df.resample('D', how = 'max')
+	print (df.groupby(["Code"]).resample('2D', how = 'sum'))
 	return df
 def get_features(path_to_txt):
 	dataset = construct_new_dataframe(path_to_txt)
@@ -89,13 +103,14 @@ def get_features(path_to_txt):
 	temp = pd.DatetimeIndex(dataset.index)
 	dataset["Weekday"] = dataset["Power"][temp.weekday == 1]
 	dataset["Weekend"] = dataset["Power"][temp.weekday == 3]
-	dataset["Maximum"] = df["Power"].resample('1d', how = 'max')
-	dataset["Minimum"] = df["Power"].resample('1d', how = 'min')
-	df["Between 6 pm and 10 pm"] = df["Power"].between_time("18:00", "22:00")
-	df["Between 6 am and 10 am"] = df["Power"].between_time("6:00", "10:00")
-	df["Between 1 am and 5 am"] = df["Power"].between_time("1:00", "5:00")
-	df["Between 10 am and 2m"] = df["Power"].between_time("10:00", "14:00")
+	print dataset.head(15)
+	dataset["Maximum"] = dataset["Power"].resample('1d', how = 'max')
+	dataset["Minimum"] = dataset["Power"].resample('1d', how = 'min')
+	dataset["Between 6 pm and 10 pm"] = dataset["Power"].between_time("18:00", "22:00")
+	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00")
+	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00")
+	dataset["Between 10 am and 2m"] = dataset["Power"].between_time("10:00", "14:00")
 	print dataset.head(10)
 get_features("/Users/Rishi/Downloads/file1.txt")
-#print construct_new_dataframe("/Users/Rishi/Downloads/file1.txt").head()
+#print construct_new_dataframe("/Users/Rishi/Downloads/file1.txt").head(40)
 #FUCK YOU LIFE!!!
