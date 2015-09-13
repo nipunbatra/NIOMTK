@@ -17,6 +17,17 @@ from sklearn.neighbors import KNeighborsClassifier
 import pytz
 import sys
 from pandas.tseries.offsets import *
+from itertools import chain
+import io
+from io import *
+import pandas as pd
+from numpy import *
+from pandas import *
+from sklearn import svm
+from sklearn.neighbors import KNeighborsClassifier
+import pytz
+import sys
+from sklearn import svm, datasets, metrics
 import random
 random.seed(42)
 def get_day_number(day):
@@ -71,7 +82,6 @@ def get_dataset(path_to_txt):
 	data = u"ID Code Power\n" + str(f1.read())
 	TESTDATA = StringIO(data)
 	df2 = DataFrame.from_csv(TESTDATA, sep=" ", parse_dates=False)
-	print "PRINT THE FUCKING HEAD", df2.head()
 	df2.sort()
 	return df2[:1000]
 def get_processed_dataset(path_to_txt):
@@ -97,31 +107,131 @@ def construct_new_dataframe(path_to_txt):
 	# df["Power"] = power
 	# df.resample('D', how = 'max')
 	return df.sort_index()
+# def get_features_new(path_to_txt):
+# 	dataset = get_processed_dataset(path_to_txt)
+# 	feature_array = []
+# 	for i in list(dataset.index):
+# 		temp_dataset = dataset[i]
+# 		feature_array.append(get_features(temp_dataset))
+# 	print feature_array
+
+
 def get_features(path_to_txt):
 	dataset = construct_new_dataframe(path_to_txt)['2009-07-14':'2009-07-21']
 	dataset = dataset.sort()
 	#print dataset.head()
-	#Consumption figures. Come on man. You can fucking do this.
-	vector_1 = dataset["Power"].values
+	vector_1 = dataset["Power"].values # c_day
 	temp = pd.DatetimeIndex(dataset.index)
 	print "Temp.weekday", temp.weekday
-	dataset["Weekday"] = dataset["Power"][temp.weekday < 5]
-	dataset["Weekend"] = dataset["Power"][temp.weekday >= 5]
+	dataset["Weekday"] = dataset["Power"][temp.weekday < 5] #c_weekday
+	dataset["Weekend"] = dataset["Power"][temp.weekday >= 5] #c_weekend
 	print dataset.head(15)
-	dataset["Maximum"] = dataset["Power"].resample('1d', how = 'max')
-	dataset["Minimum"] = dataset["Power"].resample('1d', how = 'min')
-	dataset["Between 6 pm and 10 pm"] = dataset["Power"].between_time("18:00", "22:00")
-	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00")
-	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00")
-	dataset["Between 10 am and 2m"] = dataset["Power"].between_time("10:00", "14:00")
+	dataset["Maximum"] = dataset["Power"].resample('1d', how = 'max') #c_max
+	dataset["Minimum"] = dataset["Power"].resample('1d', how = 'min') #c_min
+	dataset["Between 6 pm and 10 pm"] = dataset["Power"].between_time("18:00", "22:00") # c_evening
+	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00") # c_morning
+	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00") # c_night
+	dataset["Between 10 am and 2m"] = dataset["Power"].between_time("10:00", "14:00") # c_noon
 	#Temporal properties
 	dataset["Entry greater than 1 KW"] = dataset["Power"][dataset["Power"] > 1]
 	dataset["Entry greater than 2 KW"] = dataset["Power"][dataset["Power"] > 2]
 	dataset["Entry equal to maximum"] = dataset["Power"][dataset["Power"] == dataset["Power"].max()]
 	dataset["Entry greater than mean"] = dataset["Power"][dataset["Power"] > dataset["Power"].mean()]
-	return dataset
-	#print "Length of dataset = ", len(dataset)
+	dataset = dataset.fillna(value = 0)
+	#ratios
+	
 
-print get_features("/Users/Rishi/Downloads/file1.txt")
+	return dataset
+	print "Length of dataset = ", len(dataset)
+
+def compute(path_to_txt):
+	employed = []
+	df2 = get_features(path_to_txt)
+	df2 = df2.fillna(value = 0)
+	fp = get_employment_status("/Users/Rishi/Downloads/abc.csv")
+	fp = fp[df2["Code"].values]
+	fp = fp.fillna(value = 0)
+	lis = fp.values
+	df = df2.drop("Code", axis = 1)
+	df = df.drop("Index", axis = 1)
+	df = (df + 0.0)
+	df2_train = df.head(len(df2)/2)
+
+	ground_truth_train = lis[:len(df)/2]
+	df2_test = df.tail(len(df)/2)
+	ground_truth_test = lis[len(df)/2:]
+	dataframe_train_array = np.asarray([i for i in df2_train.values])
+	ground_truth_train_array = np.asarray(ground_truth_train)
+	dataframe_test_array = np.asarray([i for i in df2_test.values])
+	ground_truth_test_array = np.asarray(ground_truth_test)
+
+	print ground_truth_test_array
+	classifier = svm.SVC().fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
+	prediction = classifier.predict(dataframe_test_array[:100000])
+	print (metrics.classification_report(prediction, ground_truth_test[:100000]))
+	# for i in list(df2["Code"]):
+	# 	if (fp[i] < 4):
+	# 		employed.append(1)
+	# 	else:
+	# 		employed.append(0)
+	print "Lengths: ", len(df2), len(fp)
+# def get_features(dataset):
+# 	#dataset = construct_new_dataframe(path_to_txt)['2009-07-14':'2009-07-21']
+# 	#Consumption figures
+# 	c_day = dataset["Power"].mean()
+#  	temp = pd.DatetimeIndex(dataset.index)
+#  	print "Temp.weekday", temp.weekday
+#  	dataset["Weekday"] = dataset["Power"][temp.weekday < 5] #c_weekday
+#  	dataset["Weekend"] = dataset["Power"][temp.weekday >= 5]
+#  	dataset = dataset.fillna(value = 0)
+#  	c_weekday = dataset["Weekday"].mean()
+#  	c_weekend = dataset["Weekend"].mean()
+#  	dataset["Maximum"] = dataset["Power"].resample('1d', how = 'max') #c_max
+# 	dataset["Minimum"] = dataset["Power"].resample('1d', how = 'min') #c_min
+# 	dataset["Between 6 pm and 10 pm"] = dataset["Power"].between_time("18:00", "22:00") # c_evening
+# 	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00") # c_morning
+# 	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00") # c_night
+# 	dataset["Between 10 am and 2 pm"] = dataset["Power"].between_time("10:00", "14:00") # c_noon
+# 	c_max = dataset["Power"].max()
+# 	c_min = dataset["Power"].min()
+# 	c_evening = dataset["Between 6 pm and 10 pm"].mean()
+# 	c_morning = dataset["Between 6 am and 10 am"].mean()
+# 	c_night = dataset["Between 1 am and 5 am"].mean()
+# 	c_noon = dataset["Between 1 am and 5 am"].mean()
+# 	return [c_day, c_weekday, c_max, c_min, c_evening, c_morning, c_night, c_noon]
+
+
+#print get_features_new("/Users/Rishi/Downloads/file1.txt")
+
+def get_csv_ground_truth(path_to_csv):
+	df = pd.read_csv(path_to_csv)
+	return df
+
+def get_number_of_bedrooms(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	return df["Question 460: How many bedrooms are there in your home"]
+
+def get_type_of_cooking(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	return df["Question 4704: Which of the following best describes how you cook in your home"]
+
+def get_employment_status(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"][df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] < 4]
+	dataset = dataset.fillna(value = 0)
+	return dataset
+
+def get_retirement_status(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"][df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] == 5]
+	dataset = dataset.fillna(value = 0)
+	return dataset
+
+def get_family(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 410: What best describes the people you live with? READ OUT"][df["Question 410: What best describes the people you live with? READ OUT"]> 1]
+	dataset = dataset.fillna(value = 0)
+	return dataset
+
+compute("/Users/Rishi/Downloads/file1.txt")
 #print construct_new_dataframe("/Users/Rishi/Downloads/file1.txt").head(40)
-#FUCK YOU LIFE!!!
