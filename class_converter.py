@@ -29,7 +29,23 @@ import pytz
 import sys
 from sklearn import svm, datasets, metrics
 import random
+from sklearn.cross_validation import train_test_split
+from sklearn.metrics import *
+from sklearn.ensemble import RandomForestClassifier
+from common_functions import  *
+import itertools
+from sklearn import tree
 random.seed(42)
+
+
+classifiers_dict = {"SVM": svm.SVC(), "KNN": KNeighborsClassifier(n_neighbors=3),
+                    "DT": tree.DecisionTreeClassifier(),"RF":RandomForestClassifier()}
+
+metric_dict = {"Precision":precision_score, "Recall":recall_score,
+               "MCC":matthews_corrcoef, "Accuracy":accuracy_score}
+
+
+
 def get_day_number(day):
 	day = int(day)
 	list_of_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -166,9 +182,24 @@ def compute(path_to_txt):
 	ground_truth_test_array = np.asarray(ground_truth_test)
 
 	print ground_truth_test_array
-	classifier = svm.SVC().fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
-	prediction = classifier.predict(dataframe_test_array[:100000])
-	print (metrics.classification_report(prediction, ground_truth_test[:100000]))
+	out = {}
+	for clf_name, clf in classifiers_dict.iteritems():
+		out[clf_name] = {}
+		clf.fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
+		prediction = clf.predict(dataframe_test_array[:100000])
+		print "Precision for ", clf_name, " is ", precision_score(ground_truth_test, prediction)
+		print "Recall for ", clf_name, " is ", recall_score(ground_truth_test, prediction)
+		#print "MCC for ", clf_name, " is ", matthews_corrcoef(ground_truth_test, prediction)
+		print "Accuracy for ", clf_name, " is ", accuracy_score(ground_truth_test, prediction)
+		#for metric_name, metric_func in metric_dict.iteritems():
+		#	out[clf_name][metric_name] = metric_func(ground_truth_test, prediction)
+	output_dataframe = pd.DataFrame(out)
+	print output_dataframe
+
+
+	#classifier = svm.SVC().fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
+	#prediction = classifier.predict(dataframe_test_array[:100000])
+	#print (metrics.classification_report(prediction, ground_truth_test[:100000]))
 	# for i in list(df2["Code"]):
 	# 	if (fp[i] < 4):
 	# 		employed.append(1)
