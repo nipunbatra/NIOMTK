@@ -89,6 +89,7 @@ def get_dataset(path_to_txt):
 	edf = pd.read_csv(path_to_txt, sep=" ", nrows=200000, names=["home", "hour", "Power"])
 	print edf["hour"]
 	list_of_ids = edf["home"].unique()
+	list_of_frames = []
 	print len(list_of_ids)
 	for home_id in list_of_ids:
 		start_date = (edf["hour"][edf.home == home_id].iloc[0])
@@ -97,8 +98,12 @@ def get_dataset(path_to_txt):
 		a.index = pd.DatetimeIndex(start=generate_timestamp_as_string(start_date), freq='30T', periods=len(a))
 		df = pd.DataFrame(a, columns=["Power"])
 		df["Code"] = home_id
-		compute(df)
-
+		dataset = get_features(df)
+		list_of_frames.append(dataset)
+	result = concat(list_of_frames)
+	print result.head()
+	print len(result)
+	compute(result)
 def get_features(dataset):
 	print dataset.head()
 	vector_1 = dataset["Power"].values # c_day
@@ -120,25 +125,27 @@ def get_features(dataset):
 	dataset = dataset.fillna(value = 0)
 	#ratios
 	#dataset = dataset.resample('60min', how='median')
-	print dataset.head(15)
 	print "Length of dataset = ", len(dataset)
 	return dataset
 	
-def compute(dataset):
+def compute(df2):
 	employed = []
-	df2 = get_features(dataset)
-	df2 = df2.fillna(value = 0)
+	#df2 = get_features(dataset)
+	#df2 = df2.fillna(value = 0)
+	print "Filling up fp...."
 	fp = get_employment_status("/Users/Rishi/Downloads/abc.csv")
 	fp = fp[df2["Code"].values]
 	fp = fp.fillna(value = 0)
+	print "Done!"
 	lis = fp.values
 	df = df2.drop("Code", axis = 1)
 	print "GETTING HEAD: ", df.head()
 	print "GETTING INDEX", df.index
 	#df = df.drop("Index", axis = 1)
 	df = (df + 0.0)
+	print df.head()
 	df2_train = df.head(len(df2)/2)
-
+	print "Training..."
 	ground_truth_train = lis[:len(df)/2]
 	df2_test = df.tail(len(df)/2)
 	ground_truth_test = lis[len(df)/2:]
@@ -146,7 +153,7 @@ def compute(dataset):
 	ground_truth_train_array = np.asarray(ground_truth_train)
 	dataframe_test_array = np.asarray([i for i in df2_test.values])
 	ground_truth_test_array = np.asarray(ground_truth_test)
-
+	print "Done!"
 	print ground_truth_test_array
 	out = {}
 	for clf_name, clf in classifiers_dict.iteritems():
