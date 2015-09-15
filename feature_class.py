@@ -5,24 +5,17 @@ from StringIO import StringIO
 import os
 import os.path
 import io
-from io import *
 from itertools import chain
-import io
 from io import *
 import pandas as pd
 from numpy import *
 from pandas import *
-from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 import pytz
 import sys
 from pandas.tseries.offsets import *
 from itertools import chain
-import io
-from io import *
-import pandas as pd
 from numpy import *
-from pandas import *
 from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
 import pytz
@@ -35,7 +28,7 @@ from sklearn.ensemble import RandomForestClassifier
 from common_functions import  *
 import itertools
 from sklearn import tree
-
+from numpy import inf
 random.seed(42)
 
 
@@ -116,7 +109,7 @@ def get_features(dataset):
 	dataset["Between 6 pm and 10 pm"] = dataset["Power"].between_time("18:00", "22:00") # c_evening
 	dataset["Between 6 am and 10 am"] = dataset["Power"].between_time("6:00", "10:00") # c_morning
 	dataset["Between 1 am and 5 am"] = dataset["Power"].between_time("1:00", "5:00") # c_night
-	dataset["Between 10 am and 2m"] = dataset["Power"].between_time("10:00", "14:00") # c_noon
+	dataset["Between 10 am and 2 pm"] = dataset["Power"].between_time("10:00", "14:00") # c_noon
 	#Temporal properties
 	dataset["Entry greater than 1 KW"] = dataset["Power"][dataset["Power"] > 1]
 	dataset["Entry greater than 2 KW"] = dataset["Power"][dataset["Power"] > 2]
@@ -124,6 +117,23 @@ def get_features(dataset):
 	dataset["Entry greater than mean"] = dataset["Power"][dataset["Power"] > dataset["Power"].mean()]
 	dataset = dataset.fillna(value = 0)
 	#ratios
+	mean = dataset["Power"].mean()
+	maximum = dataset["Power"].max()
+	minimum = dataset["Power"].min()
+	if (mean > 0 and maximum > 0 and minimum > 0):
+		dataset["r_mean/max"] = mean/maximum
+		dataset["r_min/mean"] = minimum/mean
+	#print "A BIG NOTHING IT WILL BE FOR ME", dataset["Power"].mean()
+	dataset["r_night/r_day"] = dataset["Between 1 am and 5 am"]/dataset["Power"]
+	dataset["r_morning/noon"] = dataset["Between 6 am and 10 am"]/dataset["Between 10 am and 2 pm"]
+	dataset["r_evening/noon"] = dataset["Between 6 pm and 10 pm"]/dataset["Between 10 am and 2 pm"]
+	#Statistical properties
+	dataset["Variance"] = (dataset["Power"].std())**2
+	temp = dataset["Power"].diff()
+	temp = temp.fillna(value = 0)
+	dataset["Sum of set difference"] = sum(temp.values)
+	dataset["Power difference more than 0.2 KW"] = sum(temp[temp > 0.2].value_counts())
+	dataset = dataset.fillna(value = 0)
 	#dataset = dataset.resample('60min', how='median')
 	print "Length of dataset = ", len(dataset)
 	return dataset
@@ -154,7 +164,20 @@ def compute(df2):
 	dataframe_test_array = np.asarray([i for i in df2_test.values])
 	ground_truth_test_array = np.asarray(ground_truth_test)
 	print "Done!"
+	ground_truth_test_array[ground_truth_test_array== -inf] = 0
+	ground_truth_train_array[ground_truth_test_array== -inf] = 0
+	dataframe_train_array[dataframe_train_array== -inf] = 0
+	dataframe_test_array[dataframe_test_array == -inf] = 0
+	ground_truth_test_array[ground_truth_test_array== inf] = 0
+	ground_truth_train_array[ground_truth_test_array== inf] = 0
+	dataframe_train_array[dataframe_train_array== inf] = 0
+	dataframe_test_array[dataframe_test_array == inf] = 0
 	print ground_truth_test_array
+	print np.isnan(np.min(dataframe_train_array))
+	dataframe_train_array = np.nan_to_num(dataframe_train_array)
+	ground_truth_train = np.nan_to_num(ground_truth_train)
+	dataframe_test_array = np.nan_to_num(dataframe_test_array)
+	ground_truth_test = np.nan_to_num(ground_truth_test)
 	out = {}
 	for clf_name, clf in classifiers_dict.iteritems():
 		out[clf_name] = {}
