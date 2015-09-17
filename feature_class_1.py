@@ -92,7 +92,7 @@ def get_dataset(path_to_txt):
 	print "Done!"
 	edf = concat(input_frames)
 	print edf["hour"]
-	list_of_ids = edf["home"].unique()
+	list_of_ids = edf["home"].unique()[:-1]
 	list_of_frames = []
 	out_dict = {}
 	print len(list_of_ids)
@@ -105,7 +105,7 @@ def get_dataset(path_to_txt):
 		df["Code"] = home_id
 		out_dict[home_id] = get_features(df)
 		print out_dict
-	list_of_features = ["c_day", "c_weekday", "c_weekend", "c_max", "c_min", "c_evening", "c_morning", "c_night", "c_noon", "r_mean", "r_min", "r_night", "r_morning", "r_evening", "t_daily_max", "s_variance", "s_diff", "s_num_peaks", "s_x_corr"]
+	list_of_features = ["c_day", "c_weekday", "c_weekend", "c_max", "c_min", "c_evening", "c_morning", "c_night", "c_noon", "r_mean", "r_min", "r_night", "r_morning", "r_evening", "s_variance", "s_diff", "s_num_peaks", "s_x_corr"]
 	dataset = pd.DataFrame(out_dict)#, index = list_of_ids, columns = list_of_features)
 	dataset = dataset.T
 	dataset.index =list_of_ids
@@ -121,7 +121,7 @@ def get_dataset(path_to_txt):
 	# result = concat(list_of_frames)
 	# print result.head()
 	# print len(result)
-	# compute(result)
+	compute(dataset)
 
 def get_features(dataset):
 	c_day = dataset["Power"].mean()
@@ -151,7 +151,7 @@ def get_features(dataset):
 		r_morning = c_morning/c_noon
 		r_evening = c_evening/c_noon
 	#temporal properties
-	t_daily_max = dataset["Power"].idxmax()	
+	#t_daily_max = dataset["Power"].idxmax()	
 	s_variance = (dataset["Power"].std())**2
 	temp = dataset["Power"].diff()
 	temp = temp.fillna(value = 0)
@@ -160,7 +160,7 @@ def get_features(dataset):
 	s_num_peaks = sum(temp[temp > 0.2].value_counts())
 	s_x_corr = dataset["Power"].autocorr()
 	#dataset = dataset.resample('60min', how='median')
-	list_of_features = [c_day, c_weekday, c_weekend, c_max, c_min, c_evening, c_morning, c_night, c_noon, r_mean, r_min, r_night, r_morning, r_evening, t_daily_max, s_variance, s_diff, s_num_peaks, s_x_corr]
+	list_of_features = [c_day, c_weekday, c_weekend, c_max, c_min, c_evening, c_morning, c_night, c_noon, r_mean, r_min, r_night, r_morning, r_evening, s_variance, s_diff, s_num_peaks, s_x_corr]
 	print "LIST OF FEATURES: ", list_of_features
 	return list_of_features
 # def get_features(dataset):
@@ -204,59 +204,67 @@ def get_features(dataset):
 # 	print "Length of dataset = ", len(dataset)
 # 	return dataset
 	
-# def compute(df2):
-# 	employed = []
-# 	#df2 = get_features(dataset)
-# 	#df2 = df2.fillna(value = 0)
-# 	print "Filling up fp...."
-# 	fp = get_retirement_status("/Users/Rishi/Downloads/abc.csv")
-# 	fp = fp[df2["Code"].values]
-# 	fp = fp.fillna(value = 0)
-# 	print "Done!"
-# 	lis = fp.values
-# 	df = df2.drop("Code", axis = 1)
-# 	print "GETTING HEAD: ", df.head()
-# 	print "GETTING INDEX", df.index
-# 	#df = df.drop("Index", axis = 1)
-# 	df = (df + 0.0)
-# 	print df.head()
-# 	df2_train = df.head(len(df2)/2)
-# 	print "Training..."
-# 	ground_truth_train = lis[:len(df)/2]
-# 	df2_test = df.tail(len(df)/2)
-# 	ground_truth_test = lis[len(df)/2:]
-# 	dataframe_train_array = np.asarray([i for i in df2_train.values])
-# 	ground_truth_train_array = np.asarray(ground_truth_train)
-# 	dataframe_test_array = np.asarray([i for i in df2_test.values])
-# 	ground_truth_test_array = np.asarray(ground_truth_test)
-# 	print "Done!"
-# 	ground_truth_test_array[ground_truth_test_array== -inf] = 0
-# 	ground_truth_train_array[ground_truth_test_array== -inf] = 0
-# 	dataframe_train_array[dataframe_train_array== -inf] = 0
-# 	dataframe_test_array[dataframe_test_array == -inf] = 0
-# 	ground_truth_test_array[ground_truth_test_array== inf] = 0
-# 	ground_truth_train_array[ground_truth_test_array== inf] = 0
-# 	dataframe_train_array[dataframe_train_array== inf] = 0
-# 	dataframe_test_array[dataframe_test_array == inf] = 0
-# 	print ground_truth_test_array
-# 	print np.isnan(np.min(dataframe_train_array))
-# 	dataframe_train_array = np.nan_to_num(dataframe_train_array)
-# 	ground_truth_train = np.nan_to_num(ground_truth_train)
-# 	dataframe_test_array = np.nan_to_num(dataframe_test_array)
-# 	ground_truth_test = np.nan_to_num(ground_truth_test)
-# 	out = {}
-# 	for clf_name, clf in classifiers_dict.iteritems():
-# 		out[clf_name] = {}
-# 		clf.fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
-# 		prediction = clf.predict(dataframe_test_array[:100000])
-# 		print "Precision for ", clf_name, " is ", precision_score(ground_truth_test, prediction)
-# 		print "Recall for ", clf_name, " is ", recall_score(ground_truth_test, prediction)
-# 		#print "MCC for ", clf_name, " is ", matthews_corrcoef(ground_truth_test, prediction)
-# 		print "Accuracy for ", clf_name, " is ", accuracy_score(ground_truth_test, prediction)
-# 		for metric_name, metric_func in metric_dict.iteritems():
-# 			out[clf_name][metric_name] = metric_func(ground_truth_test, prediction)
-# 	output_dataframe = pd.DataFrame(out)
-# 	print output_dataframe
+def compute(df2):
+	employed = []
+	#df2 = get_features(dataset)
+	#df2 = df2.fillna(value = 0)
+	print "Filling up fp...."
+	# fp = get_retirement_status("/Users/Rishi/Downloads/abc.csv")
+	# fp = fp[df2["Code"].values]
+	# fp = fp.fillna(value = 0)
+
+	fp = df2["Retirement_answers"].values
+	for i in range(len(fp)):
+		if fp[i] == 5:
+			fp[i]=1
+	print fp
+	print "Done!"
+	#df2 = df2.drop("Retirement_answers", axis = 1)
+	#lis = fp.values
+	lis = list(fp)
+	df = df2#.drop("Code", axis = 1)
+	print "GETTING HEAD: ", df.head()
+	print "GETTING INDEX", df.index
+	#df = df.drop("Index", axis = 1)
+	df = (df + 0.0)
+	print df.head()
+	df2_train = df.head(len(df2)/2)
+	print "Training..."
+	ground_truth_train = lis[:len(df)/2]
+	df2_test = df.tail(len(df)/2)
+	ground_truth_test = lis[len(df)/2:]
+	dataframe_train_array = np.asarray([i for i in df2_train.values])
+	ground_truth_train_array = np.asarray(ground_truth_train)
+	dataframe_test_array = np.asarray([i for i in df2_test.values])
+	ground_truth_test_array = np.asarray(ground_truth_test)
+	print "Done!"
+	ground_truth_test_array[ground_truth_test_array== -inf] = 0
+	ground_truth_train_array[ground_truth_test_array== -inf] = 0
+	dataframe_train_array[dataframe_train_array== -inf] = 0
+	dataframe_test_array[dataframe_test_array == -inf] = 0
+	ground_truth_test_array[ground_truth_test_array== inf] = 0
+	ground_truth_train_array[ground_truth_test_array== inf] = 0
+	dataframe_train_array[dataframe_train_array== inf] = 0
+	dataframe_test_array[dataframe_test_array == inf] = 0
+	print ground_truth_test_array
+	print np.isnan(np.min(dataframe_train_array))
+	dataframe_train_array = np.nan_to_num(dataframe_train_array)
+	ground_truth_train = np.nan_to_num(ground_truth_train)
+	dataframe_test_array = np.nan_to_num(dataframe_test_array)
+	ground_truth_test = np.nan_to_num(ground_truth_test)
+	out = {}
+	for clf_name, clf in classifiers_dict.iteritems():
+		out[clf_name] = {}
+		clf.fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
+		prediction = clf.predict(dataframe_test_array[:100000])
+		print "Precision for ", clf_name, " is ", precision_score(ground_truth_test, prediction)
+		print "Recall for ", clf_name, " is ", recall_score(ground_truth_test, prediction)
+		#print "MCC for ", clf_name, " is ", matthews_corrcoef(ground_truth_test, prediction)
+		print "Accuracy for ", clf_name, " is ", accuracy_score(ground_truth_test, prediction)
+		for metric_name, metric_func in metric_dict.iteritems():
+			out[clf_name][metric_name] = metric_func(ground_truth_test, prediction)
+	output_dataframe = pd.DataFrame(out)
+	print output_dataframe
 
 
 def get_csv_ground_truth(path_to_csv):
