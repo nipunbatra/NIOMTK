@@ -87,7 +87,7 @@ def get_dataset(path_to_txt):
 	print "Reading files..."
 	for i in files:
 		print "File being read: ", i
-		edf = pd.read_csv(join(path_to_txt, i), sep=" ", nrows=200000, names=["home", "hour", "Power"])
+		edf = pd.read_csv(join(path_to_txt, i), sep=" ", names=["home", "hour", "Power"])
 		input_frames.append(edf)
 	print "Done!"
 	edf = concat(input_frames)
@@ -274,7 +274,18 @@ def get_csv_ground_truth(path_to_csv):
 def get_number_of_bedrooms(path_to_csv):
 	df = get_csv_ground_truth(path_to_csv)
 	dataset = df["Question 460: How many bedrooms are there in your home"].fillna(value = 0)
-	return dataset
+	temp_arr = []
+	for i in dataset.values:
+		if i < 2:
+			temp_arr.append(0)
+		elif i==3:
+			temp_arr.append(1)
+		elif i==4:
+			temp_arr.append(2)
+		else:
+			temp_arr.append(3)
+	df = pd.DataFrame(temp_arr, index = dataset.index, columns = ["Question 460: How many bedrooms are there in your home"])
+	return df
 
 def get_type_of_cooking(path_to_csv):
 	df = get_csv_ground_truth(path_to_csv)
@@ -289,7 +300,7 @@ def get_employment_status(path_to_csv):
 
 def get_retirement_status(path_to_csv):
 	df = get_csv_ground_truth(path_to_csv)
-	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"][df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] == 5]
+	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"][df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] == 6]
 	dataset = dataset.fillna(value = 0)
 	return dataset
 
@@ -299,4 +310,97 @@ def get_family(path_to_csv):
 	dataset = dataset.fillna(value = 0)
 	return dataset
 
-get_dataset("/Users/Rishi/Downloads")
+def get_children(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 43111: How many people under 15 years of age live in your home?"][df["Question 43111: How many people under 15 years of age live in your home?"]>=1]
+	dataset.replace(' ', np.nan, inplace = True)
+	dataset = dataset.fillna(value= 0)
+	#[df["Question 43111: How many people under 15 years of age live in your home?"]> 1]
+	#dataset = pd.DataFrame(dataset)
+	dataset = dataset.fillna(value = 0)
+	print dataset.index
+	return dataset
+
+def get_single(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = pd.DataFrame(df["Question 410: What best describes the people you live with? READ OUT"])
+	print type(dataset)
+	dataset = dataset["Question 410: What best describes the people you live with? READ OUT"]
+	lis = []
+	for i in dataset.values:
+		if i==1:
+			lis.append(1)
+		else:
+			lis.append(0)
+	dataset = pd.DataFrame(lis, index = dataset.index, columns = ["Question 410: What best describes the people you live with? READ OUT"])
+	print dataset
+	# def get_age_house(path_to_csv):
+
+def get_adults(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 420: How many people over 15 years of age live in your home?"][df["Question 420: How many people over 15 years of age live in your home?"]>=1]
+	dataset.replace(' ', np.nan, inplace = True)
+	dataset = dataset.fillna(value= 0)
+	#[df["Question 43111: How many people under 15 years of age live in your home?"]> 1]
+	#dataset = pd.DataFrame(dataset)
+	dataset = dataset.fillna(value = 0)
+	print dataset.index
+	return dataset
+
+def get_number_of_residents(path_to_csv):
+	dataset_children = get_children(path_to_csv)
+	dataset_adults = get_adults(path_to_csv)
+	temp_arr = [None] * len(dataset_adults)
+	int_arr = [None] * len(dataset_adults)
+	for i in range(len(dataset_children)):
+		temp = int(dataset_children[i]) + int(dataset_adults[i])
+		if (temp<=2 and temp!=0):
+			temp_arr[i] = "Few"
+			int_arr[i] = 0
+		else:
+			temp_arr[i] = "Many"
+			int_arr[i] = 1
+	dataset_residents = pd.DataFrame(int_arr, index = dataset_children.index, columns = ["Number of residents"])
+	return dataset_residents
+
+def get_age_house(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	dataset = df["Question 4531: Approximately how old is your home?"]
+	dataset.replace(' ', np.nan, inplace = True)
+	dataset = dataset.fillna(value= 0)
+	print dataset
+	temp_arr = []
+	int_arr = []
+	print len(dataset.values)
+	for i in range(len(dataset.values)):
+		if int(dataset.values[i]) < 4:
+			int_arr.append(0)
+			temp_arr.append(0)
+		else:
+			temp_arr.append(1)
+			int_arr.append(1)
+	return pd.DataFrame(int_arr, index = dataset.index, columns = ["Question 4531: Approximately how old is your home?"])
+
+def get_social_class(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	df = df["Question 401: SOCIAL CLASS Interviewer, Respondent said that occupation of chief income earner was.... <CLASS> Please code"]
+	df_values = df.values
+	temp_arr = []
+	int_arr = []
+	for i in df_values:
+		print i, type(i)
+		if int(i)==1:
+			int_arr.append(0)
+			temp_arr.append('AB')
+		elif int(i)==2 or int(i)==3:
+			int_arr.append(1)
+			temp_arr.append('C1C2')
+		elif int(i)==4:
+			int_arr.append(2)
+			temp_arr.append('DE')
+		else:
+			int_arr.append(3)
+			temp_arr.append("")
+	return pd.DataFrame(int_arr, index=df.index, columns = ["social_class"])
+
+print get_social_class("/Users/Rishi/Downloads/abc.csv")
