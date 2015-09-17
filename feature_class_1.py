@@ -83,16 +83,18 @@ def generate_timestamp_as_string(class_timestamp):
 def get_dataset(path_to_txt):
 	#edf = pd.read_csv(path_to_txt, sep=" ", nrows=200000, names=["home", "hour", "Power"])
 	input_frames = []
-	files = [f for f in listdir(path_to_txt) if isfile(join(path_to_txt, f)) and '.txt' in f and 'File2' not in f and 'File3' not in f and 'File6' not in f and 'File5' not in f and 'File4' not in f]
+	files = [f for f in listdir(path_to_txt) if isfile(join(path_to_txt, f)) and '.txt' in f]# and 'File2' not in f and 'File3' not in f and 'File6' not in f and 'File5' not in f and 'File4' not in f]
 	print "Reading files..."
 	for i in files:
 		print "File being read: ", i
-		edf = pd.read_csv(join(path_to_txt, i), sep=" ", names=["home", "hour", "Power"])
+		edf = pd.read_csv(join(path_to_txt, i), sep=" ",nrows = 2000000, names=["home", "hour", "Power"])
 		input_frames.append(edf)
 	print "Done!"
 	edf = concat(input_frames)
 	print edf["hour"]
-	list_of_ids = edf["home"].unique()[:-1]
+	list_of_ids = edf["home"].unique()
+	if (len(list_of_ids) % 2 == 1):
+		list_of_ids = list_of_ids[:-1]
 	list_of_frames = []
 	out_dict = {}
 	print len(list_of_ids)
@@ -113,11 +115,12 @@ def get_dataset(path_to_txt):
 	#print "OUT DICT: ", out_dict
 	fp = get_retirement_status("/Users/Rishi/Downloads/abc.csv")
 	print fp.head()
-	fp = fp[list_of_ids]
+	#fp = fp[list_of_ids]
 	print fp
 	dataset["Retirement_answers"] = fp
 	dataset = dataset.fillna(value = 0)
 	print dataset
+	dataset.to_hdf('cer.h5', 'data')
 	# result = concat(list_of_frames)
 	# print result.head()
 	# print len(result)
@@ -228,11 +231,12 @@ def compute(df2):
 	#df = df.drop("Index", axis = 1)
 	df = (df + 0.0)
 	print df.head()
-	df2_train = df.head(len(df2)/2)
+	df2_train = df.head(2616)
 	print "Training..."
-	ground_truth_train = lis[:len(df)/2]
-	df2_test = df.tail(len(df)/2)
-	ground_truth_test = lis[len(df)/2:]
+	ground_truth_train = lis[:2616]
+	df2_test = df.tail(872)
+	ground_truth_test = df2["Retirement_answers"].tail(872)
+	ground_truth_test = ground_truth_test.values
 	dataframe_train_array = np.asarray([i for i in df2_train.values])
 	ground_truth_train_array = np.asarray(ground_truth_train)
 	dataframe_test_array = np.asarray([i for i in df2_test.values])
@@ -247,16 +251,19 @@ def compute(df2):
 	dataframe_train_array[dataframe_train_array== inf] = 0
 	dataframe_test_array[dataframe_test_array == inf] = 0
 	print ground_truth_test_array
-	print np.isnan(np.min(dataframe_train_array))
-	dataframe_train_array = np.nan_to_num(dataframe_train_array)
-	ground_truth_train = np.nan_to_num(ground_truth_train)
-	dataframe_test_array = np.nan_to_num(dataframe_test_array)
-	ground_truth_test = np.nan_to_num(ground_truth_test)
+	if np.isnan(np.min(dataframe_train_array)):
+		dataframe_train_array = np.nan_to_num(dataframe_train_array)
+	if np.isnan(np.min(ground_truth_train)):
+		ground_truth_train = np.nan_to_num(ground_truth_train)
+	if np.isnan(np.min(dataframe_test_array)):
+		dataframe_test_array = np.nan_to_num(dataframe_test_array)
+	if np.isnan(np.min(ground_truth_test)):
+		ground_truth_test = np.nan_to_num(ground_truth_test)
 	out = {}
 	for clf_name, clf in classifiers_dict.iteritems():
 		out[clf_name] = {}
-		clf.fit((dataframe_train_array[:100000]),(ground_truth_train_array[:100000]))
-		prediction = clf.predict(dataframe_test_array[:100000])
+		clf.fit((dataframe_train_array),(ground_truth_train_array))
+		prediction = clf.predict(dataframe_test_array)
 		print "Precision for ", clf_name, " is ", precision_score(ground_truth_test, prediction)
 		print "Recall for ", clf_name, " is ", recall_score(ground_truth_test, prediction)
 		#print "MCC for ", clf_name, " is ", matthews_corrcoef(ground_truth_test, prediction)
@@ -300,9 +307,15 @@ def get_employment_status(path_to_csv):
 
 def get_retirement_status(path_to_csv):
 	df = get_csv_ground_truth(path_to_csv)
-	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"][df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] == 6]
-	dataset = dataset.fillna(value = 0)
-	return dataset
+	dataset = df["Question 310: What is the employment status of the chief income earner in your household, is he/she"]#[df["Question 310: What is the employment status of the chief income earner in your household, is he/she"] == 6]
+	#dataset = dataset.fillna(value = 0)
+	dataset_array = dataset.values
+	for i in range(len(dataset_array)):
+		if (int(dataset_array[i]) == 6):
+			dataset_array[i] = 1.0
+		else:
+			dataset_array[i] = 0.0
+	return pd.DataFrame(dataset_array, index = dataset.index)
 
 def get_family(path_to_csv):
 	df = get_csv_ground_truth(path_to_csv)
@@ -403,4 +416,35 @@ def get_social_class(path_to_csv):
 			temp_arr.append("")
 	return pd.DataFrame(int_arr, index=df.index, columns = ["social_class"])
 
-print get_social_class("/Users/Rishi/Downloads/abc.csv")
+def get_floor_area(path_to_csv):
+	df = get_csv_ground_truth(path_to_csv)
+	floor_area_df = df["Question 6103: What is the approximate floor area of your home?"]
+	unit_df = df["Question 61031: Is that"]
+	unit_df.replace(' ', 0, inplace = True)
+	unit_df.replace('1', 1, inplace = True)
+	unit_df.replace('2', 2, inplace = True)
+	floor_area_array = floor_area_df.values
+	unit_array = unit_df.values
+	int_arr = []
+	for i in range(len(floor_area_array)):
+		if (unit_array[i] == 2):
+			floor_area_array[i] = float(floor_area_array[i])/10.91
+		elif (int(unit_array[i]) == 1):
+			floor_area_array[i] = float(floor_area_array[i])
+		else:
+			floor_area_array[i] = -1
+	for i in range(len(floor_area_array)):
+		if floor_area_array[i] < 100:
+			int_arr.append(0)
+		elif floor_area_array[i] >=100 and floor_area_array[i] <= 200:
+			int_arr.append(1)
+		elif floor_area_array[i] > 200:
+			int_arr.append(2)
+		else:
+			int_arr.append(-1)
+	return pd.DataFrame(int_arr, index=df.index, columns = ["floor_area"])
+def get_number_of_appliances(path_to_csv):
+	list_of_questions = ["Question 49001: Washing machine",	"Question 49001: Tumble dryer", "Question 49001: Dishwasher", "Question 49001: Electric shower (instant)", "Question 49001: Electric shower (electric pumped from hot tank)", "Question 49001: Electric cooker",	"Question 49001: Electric heater (plug-in convector heaters)",	"Question 49001: Stand alone freezer",	"Question 49001: A water pump or electric well pump or pressurised water system",	"Question 49001: Immersion"	, "Question 49002: Washing machine",	"Question 49002: Tumble dryer"	,"Question 49002: Dishwasher",	"Question 49002: Electric shower (instant)", "Question 49002: Electric shower (electric pumped from hot tank)", "Question 49002: Electric cooker",	"Question 49002: Electric heater (plug-in convector heaters)",	"Question 49002: Stand alone freezer",	"Question 49002: A water pump or electric well pump or pressurised water system",	"Question 49002: Immersion",	"Question 4902: TV's less  than 21 inch",	"Question 4902: TV's greater  than 21 inch", "Question 4902: Desk-top computers",	"Question 4902: Lap-top computers", 	"Question 4902: Games consoles, such as xbox, playstation or Wii",	"Question 490002: TV's less than 21 inch",	"Question 490002: TV's greater than 21 inch"	"Question 490002: Desk-top computers",	"Question 490002: Lap-top computers",	"Question 490002: Games consoles, such as xbox, playstation or Wii",	"Question 49004: Washing machine  INT:PROBE TO PRECODES",	"Question 49004: Tumble dryer  INT:PROBE TO PRECODES",	"Question 49004: Dishwasher  INT:PROBE TO PRECODES",	"Question 490004: Electric shower (instant)  INT:PROBE TO PRECODES",	"Question 4900004: Electric shower (pumped from hot tank)  INT:PROBE TO PRECODES",	"Question 4900005: Electric cooker  INT:PROBE TO PRECODES",	"Question 4900006: Electric heater (plug-in)  INT:PROBE TO PRECODES", "Question 4900007: Water pump   INT:PROBE TO PRECODES",	"Question 4900008: Immersion water  INT:PROBE TO PRECODES",	"Question 4900009: Stand alone Freezer  INT:PROBE TO PRECODES",	"Question 49022: TV’s less than 21 inch  INT:PROBE TO PRECODES", "Question 49022: TV’s greater than 21 inch  INT:PROBE TO PRECODES", "Question 49022: Desk-top computers  INT:PROBE TO PRECODES", "Question 49022: Lap-top computers  INT:PROBE TO PRECODES", "Question 49022: Games consoles, such as xbox, playstation or Wii  INT:PROBE TO PRECODES"]
+#print get_floor_area("/Users/Rishi/Downloads/abc.csv")
+path_to_txt = "/Users/Rishi/Downloads"
+get_dataset(path_to_txt)
